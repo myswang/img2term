@@ -153,15 +153,11 @@ def main():
             val = term.inkey(timeout=0.2)
             if val.lower() == "q":
                 break
-            elif val.code == KEY_RIGHT or val.lower() == "l" and len(images) > 1:
+            elif (val.code == KEY_RIGHT or val.lower() == "l") and len(images) > 1 and img_idx < len(images) - 1:
                 img_idx += 1
-                if img_idx >= len(file_names):
-                    img_idx = 0
                 img_changed = True
-            elif val.code == KEY_LEFT or val.lower() == "h" and len(images) > 1:
+            elif (val.code == KEY_LEFT or val.lower() == "h") and len(images) > 1 and img_idx > 0:
                 img_idx -= 1
-                if img_idx < 0:
-                    img_idx = len(file_names) - 1
                 img_changed = True
 
 
