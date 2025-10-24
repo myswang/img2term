@@ -1,6 +1,7 @@
 import argparse
 from curses import KEY_LEFT, KEY_RIGHT
 import os
+from pathlib import Path
 import signal
 import numpy as np
 from blessed import Terminal
@@ -16,6 +17,17 @@ scaled_images = []
 rendered_images = []
 
 
+def load_images(file_path):
+    file_formats = {f"{ext.lower()}" for ext in Image.registered_extensions().keys()}
+    file = Path(file_path)
+    if file.is_dir():
+        sub_files = [f for f in file.iterdir() if f.is_file() and f.suffix.lower() in file_formats]
+        for sf in sub_files:
+            load_img(sf)
+    else:
+        load_img(file_path)
+
+
 def load_img(file_name):
     try:
         img = Image.open(file_name).convert("RGBA")
@@ -25,9 +37,8 @@ def load_img(file_name):
     except IsADirectoryError:
         print(f"img2term: Failed to open file {file_name}: is a directory")
         os._exit(1)
-
-    return img
-
+    file_names.append(file_name)
+    images.append(img)
 
 def resize_img(img):
     img_width = img.width
@@ -111,14 +122,17 @@ def main():
     args = parser.parse_args()
 
     if len(args.files) == 0:
-        print("img2term: No file names specified")
+        print("img2term: No files specified")
         os._exit(1)
 
     for file in args.files:
         file_name = str(file)
-        file_names.append(file_name)
-        images.append(load_img(file_name))
+        load_images(file_name)
 
+    if len(images) == 0:
+        print("img2term: No images to display")
+        os._exit(1)
+    
     global size_changed, img_changed, img_idx
     signal.signal(signal.SIGWINCH, on_resize)
 
@@ -138,12 +152,12 @@ def main():
             val = term.inkey(timeout=0.2)
             if val.lower() == "q":
                 break
-            elif val.code == KEY_RIGHT:
+            elif val.code == KEY_RIGHT and len(images) > 1:
                 img_idx += 1
                 if img_idx >= len(file_names):
                     img_idx = 0
                 img_changed = True
-            elif val.code == KEY_LEFT:
+            elif val.code == KEY_LEFT and len(images) > 1:
                 img_idx -= 1
                 if img_idx < 0:
                     img_idx = len(file_names) - 1
