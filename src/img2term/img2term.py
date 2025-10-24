@@ -1,6 +1,7 @@
 import os
 import signal
 import sys
+import numpy as np
 from blessed import Terminal
 from PIL import Image
 
@@ -43,30 +44,43 @@ def resize_img(img):
 
 
 def render_img(img):
-    for y in range(0, img.height, 2):
-        line = []
-        for x in range(img.width):
-            top = img.getpixel((x, y))
-            bottom = img.getpixel((x, y + 1)) if y + 1 < img.height else (255, 255, 255, 255)
-            tr, tg, tb, ta = top
-            br, bg, bb, ba = bottom
+    img_arr = np.array(img)
+    rgb = img_arr[..., :3].astype(np.float32)
+    alpha = img_arr[..., 3:4].astype(np.float32) / 255.0
 
-            ta /= 255 
-            ba /= 255
-            tr, tg, tb = [int(c * ta + 255 * (1 - ta)) for c in (tr, tg, tb)]
-            br, bg, bb = [int(c * ba + 255 * (1 - ba)) for c in (br, bg, bb)]
-            if y + 1 < img.height:
-                line.append(term.color_rgb(tr, tg, tb) + term.on_color_rgb(br, bg, bb) + "▀")
+    composited = rgb * alpha + 255 * (1 - alpha)
+    composited = composited.clip(0, 255).astype(np.uint8)
+
+    height, width, _ = composited.shape
+
+    output = []
+    for y in range(0, height, 2):
+        line = []
+        for x in range(width):
+            top = composited[y, x]
+            if y + 1 < height:
+                bottom = composited[y + 1, x]
+                tr, tg, tb = top
+                br, bg, bb = bottom
+                line.append(
+                    term.color_rgb(int(tr), int(tg), int(tb)) +
+                    term.on_color_rgb(int(br), int(bg), int(bb)) +
+                    "▀"
+                )
             else:
-                line.append(term.color_rgb(tr, tg, tb) + " ")
-        print(term.move_xy(0, y // 2) + "".join(line) + term.normal, end="")
+                tr, tg, tb = top
+                line.append(term.on_color_rgb(int(tr), int(tg), int(tb)) + " ")
+        output.append(term.move_xy(0, y // 2) + "".join(line) + term.normal)
+
+    sys.stdout.write("".join(output))
 
 
 def render_status(file_name, img, img_old):
     status = f"{file_name} | {img.width}x{img.height}"
     if img.width < img_old.width and img.height < img_old.height:
-        status = status + f" (original: {img_old.width}x{img_old.height})"
-    print(term.move_xy(0, term.height-1) + status, end="")
+        scale = round(img.width / img_old.width * 100)
+        status = status + f" ({scale}% {img_old.width}x{img_old.height})"
+    print(term.move_xy(0, term.height-1) + status[:term.width], end="")
 
 
 def on_resize(signum, frame):
@@ -79,7 +93,7 @@ def main():
     signal.signal(signal.SIGWINCH, on_resize)
 
     if len(sys.argv) < 2:
-        print("Usage: img2term <file_name>")
+        print("img2term: Please specify a file name")
         os._exit(1)
     file_name = str(sys.argv[1])
     img = load_img(file_name)
