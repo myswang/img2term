@@ -8,6 +8,7 @@ from blessed import Terminal
 from PIL import Image
 
 term = Terminal()
+file_formats = {f"{ext.lower()}" for ext in Image.registered_extensions().keys()}
 size_changed = False
 img_changed = True
 img_idx = 0
@@ -18,7 +19,6 @@ rendered_images = []
 
 
 def load_images(file_path):
-    file_formats = {f"{ext.lower()}" for ext in Image.registered_extensions().keys()}
     file = Path(file_path)
     if file.is_dir():
         sub_files = [f for f in file.iterdir() if f.is_file() and f.suffix.lower() in file_formats]
@@ -145,19 +145,19 @@ def main():
                     render_images()
                 status = render_status(file_names[img_idx], scaled_images[img_idx], images[img_idx])
                 output = term.home + term.clear + rendered_images[img_idx] + status + term.clear_eos
-                os.write(1, output.encode("utf-8"))
+                print(output, end="", flush=True)
                 size_changed = False
                 img_changed = False
                     
             val = term.inkey(timeout=0.2)
             if val.lower() == "q":
                 break
-            elif val.code == KEY_RIGHT and len(images) > 1:
+            elif val.code == KEY_RIGHT or val.lower() == "l" and len(images) > 1:
                 img_idx += 1
                 if img_idx >= len(file_names):
                     img_idx = 0
                 img_changed = True
-            elif val.code == KEY_LEFT and len(images) > 1:
+            elif val.code == KEY_LEFT or val.lower() == "h" and len(images) > 1:
                 img_idx -= 1
                 if img_idx < 0:
                     img_idx = len(file_names) - 1
