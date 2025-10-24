@@ -8,6 +8,7 @@ from PIL import Image
 term = Terminal()
 should_render = True
 
+
 def load_img(file_name):
     try:
         img = Image.open(file_name).convert("RGBA")
@@ -28,15 +29,10 @@ def resize_img(img):
     if img_width <= max_width and img_height <= max_height:
         return img
 
-    img_aspect = img_width / img_height
-    term_aspect = max_width / max_height
-    scale = 1.0
+    width_ratio = max_width / img_width
+    height_ratio = max_height / img_height
 
-    if img_aspect > term_aspect:
-        scale = max_width / img_width
-    else:
-        scale = max_height / img_height
-
+    scale = min(width_ratio, height_ratio)
     img_width = int(img_width * scale)
     img_height = int(img_height * scale)
 
@@ -72,7 +68,7 @@ def render_img(img):
                 line.append(term.on_color_rgb(int(tr), int(tg), int(tb)) + " ")
         output.append(term.move_xy(0, y // 2) + "".join(line) + term.normal)
 
-    sys.stdout.write("".join(output))
+    print("".join(output), end="")
 
 
 def render_status(file_name, img, img_old):
