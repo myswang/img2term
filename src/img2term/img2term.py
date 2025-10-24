@@ -1,12 +1,19 @@
+import argparse
+from curses import KEY_LEFT, KEY_RIGHT
 import os
 import signal
-import sys
 import numpy as np
 from blessed import Terminal
 from PIL import Image
 
 term = Terminal()
-should_render = True
+size_changed = False
+img_changed = True
+img_idx = 0
+file_names = []
+images = []
+scaled_images = []
+rendered_images = []
 
 
 def load_img(file_name):
@@ -14,6 +21,9 @@ def load_img(file_name):
         img = Image.open(file_name).convert("RGBA")
     except FileNotFoundError:
         print(f"img2term: Failed to open file {file_name}")
+        os._exit(1)
+    except IsADirectoryError:
+        print(f"img2term: Failed to open file {file_name}: is a directory")
         os._exit(1)
 
     return img
@@ -68,45 +78,76 @@ def render_img(img):
                 line.append(term.on_color_rgb(int(tr), int(tg), int(tb)) + " ")
         output.append(term.move_xy(0, y // 2) + "".join(line) + term.normal)
 
-    print("".join(output), end="")
+    return "".join(output)
 
 
 def render_status(file_name, img, img_old):
-    status = f"{file_name} | {img.width}x{img.height}"
+    status = f"({img_idx+1}/{len(file_names)}) {file_name} | {img.width}x{img.height}"
     if img.width < img_old.width and img.height < img_old.height:
         scale = round(img.width / img_old.width * 100)
         status = status + f" ({scale}% {img_old.width}x{img_old.height})"
-    print(term.move_xy(0, term.height-1) + status[:term.width], end="")
+    return term.move_xy(0, term.height-1) + status[:term.width]
+
+
+def render_images():
+    global scaled_images, rendered_images
+    scaled_images = []
+    rendered_images = []
+    for img in images:
+        scaled_img = resize_img(img)
+        scaled_images.append(scaled_img)
+        rendered_images.append(render_img(scaled_img))
 
 
 def on_resize(signum, frame):
-    global should_render
-    should_render = True
+    global size_changed
+    size_changed = True
 
 
 def main():
-    global should_render
+
+    parser = argparse.ArgumentParser(description="View images in your terminal")
+    parser.add_argument("files", nargs="+", help="List of image files")
+    args = parser.parse_args()
+
+    if len(args.files) == 0:
+        print("img2term: No file names specified")
+        os._exit(1)
+
+    for file in args.files:
+        file_name = str(file)
+        file_names.append(file_name)
+        images.append(load_img(file_name))
+
+    global size_changed, img_changed, img_idx
     signal.signal(signal.SIGWINCH, on_resize)
 
-    if len(sys.argv) < 2:
-        print("img2term: Please specify a file name")
-        os._exit(1)
-    file_name = str(sys.argv[1])
-    img = load_img(file_name)
+    render_images()
 
     with term.fullscreen(), term.cbreak(), term.hidden_cursor():
         while True:
-            if should_render:
-                scaled_img = resize_img(img)
-                print(term.home + term.clear, end="")
-                render_img(scaled_img)
-                render_status(file_name, scaled_img, img)
-                sys.stdout.flush()
-                should_render = False
+            if size_changed or img_changed:
+                if size_changed:
+                    render_images()
+                status = render_status(file_names[img_idx], scaled_images[img_idx], images[img_idx])
+                output = term.home + term.clear + rendered_images[img_idx] + status + term.clear_eos
+                os.write(1, output.encode("utf-8"))
+                size_changed = False
+                img_changed = False
                     
             val = term.inkey(timeout=0.2)
             if val.lower() == "q":
                 break
+            elif val.code == KEY_RIGHT:
+                img_idx += 1
+                if img_idx >= len(file_names):
+                    img_idx = 0
+                img_changed = True
+            elif val.code == KEY_LEFT:
+                img_idx -= 1
+                if img_idx < 0:
+                    img_idx = len(file_names) - 1
+                img_changed = True
 
 
 if __name__ == "__main__":
