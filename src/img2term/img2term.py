@@ -19,9 +19,9 @@ def load_img(file_name):
 
 def resize_img(img):
     img_width = img.width
-    img_height = img.height // 2
+    img_height = img.height
     max_width = term.width
-    max_height = term.height - 1 # allow space for printing at bottom
+    max_height = 2 * (term.height - 1) # allow space for printing at bottom
 
     # do not scale the image if its smaller than max_width/height
     if img_width <= max_width and img_height <= max_height:
@@ -43,16 +43,30 @@ def resize_img(img):
 
 
 def render_img(img):
-    for y in range(img.height):
+    for y in range(0, img.height, 2):
         line = []
         for x in range(img.width):
-            r, g, b, a = img.getpixel((x, y))
-            a /= 255.0
-            r = int(r * a + 255 * (1 - a))
-            g = int(g * a + 255 * (1 - a))
-            b = int(b * a + 255 * (1 - a))
-            line.append(term.on_color_rgb(r, g, b) + " ")
-        print(term.move_xy(0, y) + "".join(line) + term.normal, end="")
+            top = img.getpixel((x, y))
+            bottom = img.getpixel((x, y + 1)) if y + 1 < img.height else (255, 255, 255, 255)
+            tr, tg, tb, ta = top
+            br, bg, bb, ba = bottom
+
+            ta /= 255 
+            ba /= 255
+            tr, tg, tb = [int(c * ta + 255 * (1 - ta)) for c in (tr, tg, tb)]
+            br, bg, bb = [int(c * ba + 255 * (1 - ba)) for c in (br, bg, bb)]
+            if y + 1 < img.height:
+                line.append(term.color_rgb(tr, tg, tb) + term.on_color_rgb(br, bg, bb) + "▀")
+            else:
+                line.append(term.color_rgb(tr, tg, tb) + " ")
+        print(term.move_xy(0, y // 2) + "".join(line) + term.normal, end="")
+
+
+def render_status(file_name, img, img_old):
+    status = f"{file_name} | {img.width}x{img.height}"
+    if img.width < img_old.width and img.height < img_old.height:
+        status = status + f" (original: {img_old.width}x{img_old.height})"
+    print(term.move_xy(0, term.height-1) + status, end="")
 
 
 def on_resize(signum, frame):
@@ -65,7 +79,7 @@ def main():
     signal.signal(signal.SIGWINCH, on_resize)
 
     if len(sys.argv) < 2:
-        print("img2term: Please specify a file")
+        print("Usage: img2term <file_name>")
         os._exit(1)
     file_name = str(sys.argv[1])
     img = load_img(file_name)
@@ -76,8 +90,7 @@ def main():
                 scaled_img = resize_img(img)
                 print(term.home + term.clear, end="")
                 render_img(scaled_img)
-                # print the file name at the bottom
-                print(term.move_xy(0, term.height-1) + file_name, end="")
+                render_status(file_name, scaled_img, img)
                 sys.stdout.flush()
                 should_render = False
                     
