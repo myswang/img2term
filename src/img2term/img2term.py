@@ -71,6 +71,8 @@ def render_img(img):
     height, width, _ = composited.shape
 
     output = []
+    mid_x = (term.width - width) // 2
+    mid_y = (term.height * 2 - height) // 4
     for y in range(0, height, 2):
         line = []
         for x in range(width):
@@ -87,7 +89,7 @@ def render_img(img):
             else:
                 tr, tg, tb = top
                 line.append(term.on_color_rgb(int(tr), int(tg), int(tb)) + " ")
-        output.append(term.move_xy(0, y // 2) + "".join(line) + term.normal)
+        output.append(term.move_xy(mid_x, mid_y + (y // 2)) + "".join(line) + term.normal)
 
     return "".join(output)
 
@@ -116,7 +118,6 @@ def on_resize(signum, frame):
 
 
 def main():
-
     parser = argparse.ArgumentParser(description="View images in your terminal")
     parser.add_argument("files", nargs="+", help="List of image files")
     args = parser.parse_args()
