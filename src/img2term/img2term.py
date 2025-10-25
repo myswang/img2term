@@ -9,13 +9,13 @@ from PIL import Image
 
 term = Terminal()
 file_formats = {f"{ext.lower()}" for ext in Image.registered_extensions().keys()}
-size_changed = False
-img_changed = True
+resize_detected = False
+needs_render = True
 img_idx = 0
 file_names = []
 images = []
-scaled_images = []
-rendered_images = []
+scaled_images = {}
+rendered_images = {}
 
 
 def load_images(file_path):
@@ -97,24 +97,15 @@ def render_img(img):
 def render_status(file_name, img, img_old):
     status = f"({img_idx+1}/{len(file_names)}) {file_name} | {img.width}x{img.height}"
     if img.width < img_old.width and img.height < img_old.height:
-        scale = round(img.width / img_old.width * 100)
-        status = status + f" ({scale}% {img_old.width}x{img_old.height})"
+        scale = round((img.width * img.height) / (img_old.width * img_old.height) * 100, 1)
+        status = status + f" ({scale}% of {img_old.width}x{img_old.height})"
     return term.move_xy(0, term.height-1) + status[:term.width]
 
 
-def render_images():
-    global scaled_images, rendered_images
-    scaled_images = []
-    rendered_images = []
-    for img in images:
-        scaled_img = resize_img(img)
-        scaled_images.append(scaled_img)
-        rendered_images.append(render_img(scaled_img))
-
-
 def on_resize(signum, frame):
-    global size_changed
-    size_changed = True
+    global resize_detected, needs_render
+    resize_detected = True
+    needs_render = True
 
 
 def main():
@@ -134,31 +125,35 @@ def main():
         print("img2term: No images to display")
         os._exit(1)
     
-    global size_changed, img_changed, img_idx
+    global resize_detected, needs_render, img_idx, scaled_images, rendered_images
     signal.signal(signal.SIGWINCH, on_resize)
-
-    render_images()
 
     with term.fullscreen(), term.cbreak(), term.hidden_cursor():
         while True:
-            if size_changed or img_changed:
-                if size_changed:
-                    render_images()
+            if needs_render:
+                if resize_detected:
+                    scaled_images = {}
+                    rendered_images = {}
+                    resize_detected = False
+                if img_idx not in scaled_images.keys():
+                    scaled_images[img_idx] = resize_img(images[img_idx])
+                    rendered_images[img_idx] = render_img(scaled_images[img_idx])
                 status = render_status(file_names[img_idx], scaled_images[img_idx], images[img_idx])
                 output = term.home + term.clear + rendered_images[img_idx] + status + term.clear_eos
                 print(output, end="", flush=True)
-                size_changed = False
-                img_changed = False
+                needs_render = False
                     
             val = term.inkey(timeout=0.2)
             if val.lower() == "q":
                 break
-            elif (val.code == KEY_RIGHT or val.lower() == "l") and len(images) > 1 and img_idx < len(images) - 1:
+            elif (val.code == KEY_RIGHT or val.lower() == "l") \
+                  and len(images) > 1 and img_idx < len(images) - 1:
                 img_idx += 1
-                img_changed = True
-            elif (val.code == KEY_LEFT or val.lower() == "h") and len(images) > 1 and img_idx > 0:
+                needs_render = True
+            elif (val.code == KEY_LEFT or val.lower() == "h") \
+                  and len(images) > 1 and img_idx > 0:
                 img_idx -= 1
-                img_changed = True
+                needs_render = True
 
 
 if __name__ == "__main__":
