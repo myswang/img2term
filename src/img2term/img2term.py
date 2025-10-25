@@ -60,16 +60,19 @@ def resize_img(img):
     return img.resize((img_width, img_height), Image.Resampling.LANCZOS)
 
 
-def render_img(img):
+def img_to_array(img):
     img_arr = np.array(img)
     rgb = img_arr[..., :3].astype(np.float32)
     alpha = img_arr[..., 3:4].astype(np.float32) / 255.0
 
     composited = rgb * alpha + 255 * (1 - alpha)
     composited = composited.clip(0, 255).astype(np.uint8)
-
     height, width, _ = composited.shape
+    return composited, height, width
 
+
+def render_img(img):
+    composited, height, width = img_to_array(img)
     output = []
     mid_x = (term.width - width) // 2
     mid_y = (term.height * 2 - height) // 4
@@ -88,9 +91,45 @@ def render_img(img):
                 )
             else:
                 tr, tg, tb = top
-                line.append(term.on_color_rgb(int(tr), int(tg), int(tb)) + " ")
-        output.append(term.move_xy(mid_x, mid_y + (y // 2)) + "".join(line) + term.normal)
+                line.append(term.color_rgb(int(tr), int(tg), int(tb)) + "▀")
 
+        output.append(term.move_xy(mid_x, mid_y + (y // 2)) + "".join(line) + term.normal)
+    return "".join(output)
+
+
+# render the image at a 1-pixel offset, rather than at whole characters
+def render_img_offset(img):
+    composited, height, width = img_to_array(img)
+    output = []
+    mid_x = (term.width - width) // 2
+    mid_y = (term.height * 2 - height) // 4
+    y = 0
+    screen_y = 0
+    while y < height:
+        line = []
+        for x in range(width):
+            top = composited[y, x]
+            if y == 0:
+                br, bg, bb = top
+                line.append(term.color_rgb(int(br), int(bg), int(bb)) + "▄")
+            elif y + 1 < height:
+                bottom = composited[y + 1, x]
+                tr, tg, tb = top
+                br, bg, bb = bottom
+                line.append(
+                    term.color_rgb(int(tr), int(tg), int(tb)) +
+                    term.on_color_rgb(int(br), int(bg), int(bb)) +
+                    "▀"
+                )
+            else:
+                tr, tg, tb = top
+                line.append(term.color_rgb(int(tr), int(tg), int(tb)) + "▀")
+
+        output.append(term.move_xy(mid_x, mid_y + (screen_y // 2) - 1) + "".join(line) + term.normal)
+        y += 1
+        screen_y += 2
+        if y > 1:
+            y += 1
     return "".join(output)
 
 
@@ -137,7 +176,11 @@ def main():
                     resize_detected = False
                 if img_idx not in scaled_images.keys():
                     scaled_images[img_idx] = resize_img(images[img_idx])
-                    rendered_images[img_idx] = render_img(scaled_images[img_idx])
+                    mid_y = (term.height * 2 - scaled_images[img_idx].height) // 2
+                    if mid_y % 2 == 0:
+                        rendered_images[img_idx] = render_img_offset(scaled_images[img_idx])
+                    else:
+                        rendered_images[img_idx] = render_img(scaled_images[img_idx])
                 status = render_status(file_names[img_idx], scaled_images[img_idx], images[img_idx])
                 output = term.home + term.clear + rendered_images[img_idx] + status + term.clear_eos
                 print(output, end="", flush=True)
