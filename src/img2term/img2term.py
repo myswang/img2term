@@ -5,7 +5,7 @@ from pathlib import Path
 import signal
 import numpy as np
 from blessed import Terminal
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 term = Terminal()
 file_formats = {f"{ext.lower()}" for ext in Image.registered_extensions().keys()}
@@ -37,6 +37,9 @@ def load_img(file_name):
         os._exit(1)
     except IsADirectoryError:
         print(f"img2term: Failed to open file {file_name}: is a directory")
+        os._exit(1)
+    except UnidentifiedImageError:
+        print(f"img2term: Unsupported image format {file_name}")
         os._exit(1)
     file_names.append(file_name)
     images.append(img)
