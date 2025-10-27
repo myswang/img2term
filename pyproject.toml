@@ -24,3 +24,7 @@ Repository = "https://github.com/myswang/img2term"
 
 [project.scripts]
 img2term = "img2term.img2term:main"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"

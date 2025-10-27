@@ -22,7 +22,11 @@ rendered_images = {}
 def load_images(file_path):
     file = Path(file_path)
     if file.is_dir():
-        sub_files = [f for f in file.iterdir() if f.is_file() and f.suffix.lower() in file_formats]
+        sub_files = [
+            f
+            for f in file.iterdir()
+            if f.is_file() and f.suffix.lower() in file_formats
+        ]
         for sf in sub_files:
             load_img(sf)
     else:
@@ -43,6 +47,7 @@ def load_img(file_name):
         os._exit(1)
     file_names.append(file_name)
     images.append(img)
+
 
 def resize_img(img):
     img_width = img.width
@@ -96,15 +101,17 @@ def render_img(img):
                 tr, tg, tb = top
                 br, bg, bb = bottom
                 line.append(
-                    term.color_rgb(int(tr), int(tg), int(tb)) +
-                    term.on_color_rgb(int(br), int(bg), int(bb)) +
-                    "▀"
+                    term.color_rgb(int(tr), int(tg), int(tb))
+                    + term.on_color_rgb(int(br), int(bg), int(bb))
+                    + "▀"
                 )
             else:
                 tr, tg, tb = top
                 line.append(term.color_rgb(int(tr), int(tg), int(tb)) + "▀")
 
-        output.append(term.move_xy(mid_x, mid_y + (y // 2)) + "".join(line) + term.normal)
+        output.append(
+            term.move_xy(mid_x, mid_y + (y // 2)) + "".join(line) + term.normal
+        )
     return "".join(output)
 
 
@@ -132,15 +139,17 @@ def render_img_offset(img):
                 tr, tg, tb = top
                 br, bg, bb = bottom
                 line.append(
-                    term.color_rgb(int(tr), int(tg), int(tb)) +
-                    term.on_color_rgb(int(br), int(bg), int(bb)) +
-                    "▀"
+                    term.color_rgb(int(tr), int(tg), int(tb))
+                    + term.on_color_rgb(int(br), int(bg), int(bb))
+                    + "▀"
                 )
             else:
                 tr, tg, tb = top
                 line.append(term.color_rgb(int(tr), int(tg), int(tb)) + "▀")
 
-        output.append(term.move_xy(mid_x, mid_y + (screen_y // 2)) + "".join(line) + term.normal)
+        output.append(
+            term.move_xy(mid_x, mid_y + (screen_y // 2)) + "".join(line) + term.normal
+        )
         y += 1
         screen_y += 2
         if y > 1:
@@ -149,11 +158,13 @@ def render_img_offset(img):
 
 
 def render_status(file_name, img, img_old):
-    status = f"({img_idx+1}/{len(file_names)}) {file_name} | {img.width}x{img.height}"
+    status = f"({img_idx + 1}/{len(file_names)}) {file_name} | {img.width}x{img.height}"
     if img.width < img_old.width and img.height < img_old.height:
-        scale = round((img.width * img.height) / (img_old.width * img_old.height) * 100, 1)
+        scale = round(
+            (img.width * img.height) / (img_old.width * img_old.height) * 100, 1
+        )
         status = status + f" ({scale}% of {img_old.width}x{img_old.height})"
-    return term.move_xy(0, term.height-1) + status[:term.width]
+    return term.move_xy(0, term.height - 1) + status[: term.width]
 
 
 def on_resize(signum, frame):
@@ -163,10 +174,16 @@ def on_resize(signum, frame):
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="img2term", description="view images in your terminal")
-    parser.add_argument("file", nargs="+", help="an image file, or a directory containing image files")
-    parser.add_argument("-n", "--nostatus", action="store_false", help="hide the status bar")
-    args = parser.parse_args()        
+    parser = argparse.ArgumentParser(
+        prog="img2term", description="view images in your terminal"
+    )
+    parser.add_argument(
+        "file", nargs="+", help="an image file, or a directory containing image files"
+    )
+    parser.add_argument(
+        "-n", "--nostatus", action="store_false", help="hide the status bar"
+    )
+    args = parser.parse_args()
 
     if len(args.file) == 0:
         print("img2term: No files specified")
@@ -179,8 +196,14 @@ def main():
     if len(images) == 0:
         print("img2term: No images to display")
         os._exit(1)
-    
-    global resize_detected, needs_render, show_status, img_idx, scaled_images, rendered_images
+
+    global \
+        resize_detected, \
+        needs_render, \
+        show_status, \
+        img_idx, \
+        scaled_images, \
+        rendered_images
     signal.signal(signal.SIGWINCH, on_resize)
 
     show_status = args.nostatus
@@ -199,26 +222,36 @@ def main():
                         vy -= 1
                     mid_y = (vy * 2 - scaled_images[img_idx].height) // 2
                     if mid_y % 2 != 0:
-                        rendered_images[img_idx] = render_img_offset(scaled_images[img_idx])
+                        rendered_images[img_idx] = render_img_offset(
+                            scaled_images[img_idx]
+                        )
                     else:
                         rendered_images[img_idx] = render_img(scaled_images[img_idx])
                 if show_status:
-                    status = render_status(file_names[img_idx], scaled_images[img_idx], images[img_idx])
+                    status = render_status(
+                        file_names[img_idx], scaled_images[img_idx], images[img_idx]
+                    )
                 else:
                     status = ""
                 output = term.home + term.clear + rendered_images[img_idx] + status
                 print(output, end="", flush=True)
                 needs_render = False
-                    
+
             val = term.inkey(timeout=0.2)
             if val.lower() == "q":
                 break
-            elif (val.code == KEY_RIGHT or val.lower() == "l") \
-                  and len(images) > 1 and img_idx < len(images) - 1:
+            elif (
+                (val.code == KEY_RIGHT or val.lower() == "l")
+                and len(images) > 1
+                and img_idx < len(images) - 1
+            ):
                 img_idx += 1
                 needs_render = True
-            elif (val.code == KEY_LEFT or val.lower() == "h") \
-                  and len(images) > 1 and img_idx > 0:
+            elif (
+                (val.code == KEY_LEFT or val.lower() == "h")
+                and len(images) > 1
+                and img_idx > 0
+            ):
                 img_idx -= 1
                 needs_render = True
             elif val.lower() == "s":
